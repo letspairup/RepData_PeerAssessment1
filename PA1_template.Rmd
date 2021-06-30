@@ -1,25 +1,160 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Week2 C5 assignment"
+author: "letspairup"
+date: "6/21/2021"
+output: html_document
 ---
 
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+## Load data and create data frame
 
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
+- download data from source
+- unzip it
+- convert it to data frame
 
 
-## Imputing missing values
+```{r}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",
+              destfile = "activity.zip", mode="wb")
+
+unzip("activity.zip")
+
+repdata <- read.csv("activity.csv", header = TRUE)
+
+```
+
+## Sample data
+
+```{r}
+knitr::kable(head(repdata))
+```
+
+## Total number of steps by day
+
+```{r, include=TRUE, message=FALSE}
+
+library("dplyr")
+
+dailystep_count <- repdata %>% 
+  select(date, steps) %>% 
+  filter(!is.na(steps)) %>%
+  group_by(date) %>%
+  summarise(total_steps = sum(steps))
+
+head(dailystep_count)
+
+with(dailystep_count, 
+     hist(total_steps, breaks = 15))
+
+summary(dailystep_count)
+
+```
+
+High level summary of daily step counts. You can see __mean is 10766__ and __median is 10765__.
+
+## Average daily activity pattern - Time series plot
+
+```{r}
+library(ggplot2)
+repdata_by_interval <- repdata %>% na.omit() %>%
+                      group_by(interval) %>% summarise(avg_steps= mean(steps)) 
+
+ggplot(repdata_by_interval, aes(x=interval, y=avg_steps))+ geom_line()
+```
+
+## Five minute inteval with max steps - across all days
+
+```{r}
+repdata_by_interval[which.max(repdata_by_interval$avg_steps),]
+```
+
+## Total number of missing values
+
+```{r}
+sum(is.na(repdata))
+```
+
+## Total number of missing values
+
+```{r}
+sum(is.na(repdata))
+```
+
+## Strategy to fill missing values
+
+Here we are going to use daily mean to fill missing values.
+
+```{r}
+fill_with_mean <- function(x)
+{
+  replace(x, is.na(x), mean(x, na.rm = TRUE))
+}
+
+complete_data <- repdata %>% mutate(steps = fill_with_mean(steps))
+
+sum(is.na(complete_data))
+```
+
+complete_data is not having any missing values.:)
+
+## Total number of steps by day and mean/median with complete data set
+
+```{r}
+dailystep_count_with_complete_data <- complete_data %>% 
+  group_by(date) %>%
+  summarise(total_steps = sum(steps))
+
+with(dailystep_count_with_complete_data, 
+     hist(total_steps, breaks = 15))
+
+summary(dailystep_count_with_complete_data)
+```
+
+You can see __mean is 10766__ and __median is 10766__. *__Not much different from when we removed NA values.__*
+
+## Activity pattern between weekdays and weekend
+
+- Convert text based date column to Date
+- Add new column day_category; marked row as either weekend or weekday based on the day of date.
+- Group by data by day_category and interval
+- Calculate average steps in avg_steps
+
+```{r}
+str(repdata)
+repdata$date <- as.Date(repdata$date)
+str(repdata)
+
+
+get_day_category <- function(x) {
+  if("Saturday" == weekdays(x) | "Sunday" == weekdays(x))
+  {
+    return("weekend")
+  }
+  else
+  {
+    return("weekday")
+  }
+}
+
+comparedata <- repdata %>% filter(!is.na(steps)) %>%
+  mutate(day_category = sapply(date,get_day_category)) %>%
+  select(steps,interval, day_category) %>%
+  group_by(day_category, interval) %>%
+  mutate(avg_steps = mean(steps, na.rm = TRUE))
+
+#str(comparedata)
+```
+Plot time series graph
+```{r}
+ggplot(comparedata, aes(x=interval, y=avg_steps, color=day_category)) + geom_line() +
+facet_grid(day_category ~.) + xlab("Time interval") + ylab("Average steps - Mean") +
+    ggtitle("Comparison of steps between weekend and weekdays")
+```
+
+We can clearly see that more steps are taken in week days on an average. Also weekend data is well distributed across active time intervals.
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
